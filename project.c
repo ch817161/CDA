@@ -11,7 +11,7 @@ void ALU(unsigned A, unsigned B, char ALUControl, unsigned *ALUresult, char *Zer
         case 3: *ALUresult = (A < B) ? 1 : 0; break; // Set less than (unsigned)
         case 4: *ALUresult = A & B; break; // AND
         case 5: *ALUresult = A | B; break; // OR
-        case 6: *ALUresult = B << 16; break; // Shift left extended 16 bits
+        case 6: *ALUresult = B << 16; break; // Load upper immediate: Shift left extended 16 bits
         case 7: *ALUresult = ~A; break; // NOT A
     }
 
@@ -23,11 +23,11 @@ void ALU(unsigned A, unsigned B, char ALUControl, unsigned *ALUresult, char *Zer
 int instruction_fetch(unsigned PC, unsigned *Mem, unsigned *instruction)
 {
     // Halt if not word-aligned or out of 64kB range [cite: 98, 111]
-    if (PC % 4 != 0 || PC > 0xFFFF) 
+    if (PC % 4 != 0 || PC > 65536) 
         return 1;
 
     // Convert byte address to word index for Mem array [cite: 24, 35]
-    *instruction = Mem[PC >> 2]; 
+    *instruction = Mem[PC / 4]; 
     return 0;
 }
 
@@ -56,7 +56,7 @@ int instruction_decode(unsigned op, struct_controls *controls)
         case 0x00: // R-type
             controls->RegDst = 1; controls->RegWrite = 1; controls->ALUOp = 7; break;
         case 0x08: // addi
-            controls->RegWrite = 1; controls->ALUSrc = 1; break;
+            controls->RegWrite = 1; controls->ALUSrc = 1; controls->ALUOp = 0; break;
         case 0x23: // lw
             controls->MemRead = 1; controls->RegWrite = 1; controls->ALUSrc = 1; controls->MemtoReg = 1; break;
         case 0x2b: // sw (Use 2 for "don't cares") [cite: 184]
@@ -132,7 +132,9 @@ void write_register(unsigned r2, unsigned r3, unsigned memdata, unsigned ALUresu
         // MUX for destination register [cite: 42, 43]
         unsigned dest = (RegDst == 1) ? r3 : r2;
         // MUX for data to write [cite: 165]
-        Reg[dest] = (MemtoReg == 1) ? memdata : ALUresult;
+        if (dest !=0) {
+            Reg[dest] = (MemtoReg == 1) ? memdata : ALUresult;
+        }
     }
 }
 
