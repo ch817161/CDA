@@ -4,15 +4,35 @@
 void ALU(unsigned A, unsigned B, char ALUControl, unsigned *ALUresult, char *Zero)
 {
     // Apply operations based on the 3-bit ALUControl signal 
-    switch (ALUControl) {
-        case 0: *ALUresult = A + B; break; // Add
-        case 1: *ALUresult = A - B; break; // Subtract
-        case 2: *ALUresult = ((int)A < (int)B) ? 1 : 0; break; // Set less than (signed)
-        case 3: *ALUresult = (A < B) ? 1 : 0; break; // Set less than (unsigned)
-        case 4: *ALUresult = A & B; break; // AND
-        case 5: *ALUresult = A | B; break; // OR
-        case 6: *ALUresult = B << 16; break; // Load upper immediate: Shift left extended 16 bits
-        case 7: *ALUresult = ~A; break; // NOT A
+    switch (ALUControl) 
+    {
+        case 0: 
+            *ALUresult = A + B; 
+            break; // Add
+        case 1: 
+            *ALUresult = A - B; 
+            break; // Subtract
+        case 2: 
+            *ALUresult = ((int)A < (int)B) ? 1 : 0; 
+            break; // Set less than (signed)
+        case 3: 
+            *ALUresult = (A < B) ? 1 : 0; 
+            break; // Set less than (unsigned)
+        case 4: 
+            *ALUresult = A & B; 
+            break; // AND
+        case 5: 
+            *ALUresult = A | B; 
+            break; // OR
+        case 6: 
+            *ALUresult = (B & 0xFFFF) << 16; 
+            break; // Load upper immediate: Shift left extended 16 bits
+        case 7: 
+            *ALUresult = ~A; 
+            break; // NOT A
+        default:
+            *ALUresult = 0;
+            break; // makes sure there's no undefined results
     }
 
     // Assign Zero to 1 if the result is zero; otherwise, assign 0 
@@ -23,11 +43,12 @@ void ALU(unsigned A, unsigned B, char ALUControl, unsigned *ALUresult, char *Zer
 int instruction_fetch(unsigned PC, unsigned *Mem, unsigned *instruction)
 {
     // Halt if not word-aligned or out of 64kB range 
-    if (PC % 4 != 0 || PC > 65536) 
+    if (PC % 4 != 0 || PC >= 65536) 
+    {
         return 1;
-
+    }
     // Convert byte address to word index for Mem array 
-    *instruction = Mem[PC / 4]; 
+    *instruction = Mem[PC >> 2]; 
     return 0;
 }
 
@@ -48,30 +69,70 @@ void instruction_partition(unsigned instruction, unsigned *op, unsigned *r1, uns
 int instruction_decode(unsigned op, struct_controls *controls)
 {
     // Initialize all to 0/disabled first
-    controls->RegDst = 0; controls->Jump = 0; controls->Branch = 0;
-    controls->MemRead = 0; controls->MemtoReg = 0; controls->ALUOp = 0;
-    controls->MemWrite = 0; controls->ALUSrc = 0; controls->RegWrite = 0;
+    controls->RegDst = 0; 
+    controls->Jump = 0; 
+    controls->Branch = 0;
+    controls->MemRead = 0; 
+    controls->MemtoReg = 0; 
+    controls->ALUOp = 0;
+    controls->MemWrite = 0; 
+    controls->ALUSrc = 0; 
+    controls->RegWrite = 0;
 
-    switch (op) {
+    switch (op) 
+    {
         case 0x00: // R-type
-            controls->RegDst = 1; controls->RegWrite = 1; controls->ALUOp = 7; break;
+            controls->RegDst = 1; 
+            controls->RegWrite = 1; 
+            controls->ALUOp = 7; 
+            break;
         case 0x08: // addi
-            controls->RegWrite = 1; controls->ALUSrc = 1; controls->ALUOp = 0; break;
+            controls->RegWrite = 1; 
+            controls->ALUSrc = 1; 
+            controls->ALUOp = 0; 
+            break;
         case 0x23: // lw
-            controls->MemRead = 1; controls->RegWrite = 1; controls->ALUSrc = 1; controls->MemtoReg = 1; break;
+            controls->MemRead = 1; 
+            controls->RegWrite = 1; 
+            controls->ALUSrc = 1; 
+            controls->MemtoReg = 1; 
+            controls->ALUOp = 0;
+            break;
         case 0x2b: // sw (Use 2 for "don't cares") 
-            controls->MemWrite = 1; controls->RegDst = 2; controls->ALUSrc = 1; controls->MemtoReg = 2; break;
+            controls->MemWrite = 1; 
+            controls->RegDst = 2; 
+            controls->ALUSrc = 1; 
+            controls->MemtoReg = 2;
+            controls->ALUOp = 0;
+            break;
         case 0x04: // beq (Use 2 for "don't cares") 
-            controls->Branch = 1; controls->ALUOp = 1; controls->RegDst = 2; controls->MemtoReg = 2; break;
+            controls->Branch = 1; 
+            controls->ALUOp = 1; 
+            controls->RegDst = 2; 
+            controls->MemtoReg = 2; 
+            break;
         case 0x02: // j (Use 2 for "don't cares") 
-            controls->Jump = 1; controls->RegDst = 2; controls->MemtoReg = 2; break;
+            controls->Jump = 1; 
+            controls->RegDst = 2; 
+            controls->MemtoReg = 2; 
+            break;
         case 0x0f: // lui
-            controls->RegWrite = 1; controls->ALUSrc = 1; controls->ALUOp = 6; break;
+            controls->RegWrite = 1; 
+            controls->ALUSrc = 1; 
+            controls->ALUOp = 6; 
+            break;
         case 0x0a: // slti
-            controls->RegWrite = 1; controls->ALUSrc = 1; controls->ALUOp = 2; break;
+            controls->RegWrite = 1; 
+            controls->ALUSrc = 1; 
+            controls->ALUOp = 2; 
+            break;
         case 0x0b: // sltiu
-            controls->RegWrite = 1; controls->ALUSrc = 1; controls->ALUOp = 3; break;
-        default: return 1; // Illegal instruction 
+            controls->RegWrite = 1; 
+            controls->ALUSrc = 1; 
+            controls->ALUOp = 3; 
+            break;
+        default: 
+            return 1; // Illegal instruction 
     }
     return 0;
 }
@@ -88,17 +149,23 @@ void sign_extend(unsigned offset, unsigned *extended_value)
 {
     // Handle two's complement extension 
     if ((offset >> 15) & 1) 
+    {
         *extended_value = offset | 0xFFFF0000;
+    }
     else 
+    {
         *extended_value = offset & 0x0000FFFF;
+    }
 }
 
 /* ALU operations */
 int ALU_operations(unsigned data1, unsigned data2, unsigned extended_value, unsigned funct, char ALUOp, char ALUSrc, unsigned *ALUresult, char *Zero)
 {
     char control = ALUOp;
-    if (ALUOp == 7) { // R-type decoding 
-        switch (funct) {
+    if (ALUOp == 7) 
+    { // R-type decoding 
+        switch (funct) 
+        {
             case 0x20: control = 0; break; // add
             case 0x22: control = 1; break; // sub
             case 0x24: control = 4; break; // and
@@ -116,11 +183,21 @@ int ALU_operations(unsigned data1, unsigned data2, unsigned extended_value, unsi
 /* Read / Write Memory */
 int rw_memory(unsigned ALUresult, unsigned data2, char MemWrite, char MemRead, unsigned *memdata, unsigned *Mem)
 {
-    if (MemRead == 1 || MemWrite == 1) {
+    if (MemRead == 1 || MemWrite == 1) 
+    {
         // Halt if address is not word-aligned 
-        if (ALUresult % 4 != 0 || ALUresult > 0xFFFF) return 1; 
-        if (MemRead == 1) *memdata = Mem[ALUresult >> 2];
-        if (MemWrite == 1) Mem[ALUresult >> 2] = data2;
+        if (ALUresult % 4 != 0 || ALUresult >= 65536)
+        {
+            return 1; 
+        }
+        if (MemRead == 1) 
+        {
+            *memdata = Mem[ALUresult >> 2];
+        }
+        if (MemWrite == 1) 
+        {
+            Mem[ALUresult >> 2] = data2;
+        }
     }
     return 0;
 }
@@ -128,11 +205,13 @@ int rw_memory(unsigned ALUresult, unsigned data2, char MemWrite, char MemRead, u
 /* Write Register */
 void write_register(unsigned r2, unsigned r3, unsigned memdata, unsigned ALUresult, char RegWrite, char RegDst, char MemtoReg, unsigned *Reg)
 {
-    if (RegWrite == 1) {
+    if (RegWrite == 1) 
+    {
         // MUX for destination register 
         unsigned dest = (RegDst == 1) ? r3 : r2;
         // MUX for data to write 
-        if (dest !=0) {
+        if (dest !=0) 
+        {
             Reg[dest] = (MemtoReg == 1) ? memdata : ALUresult;
         }
     }
@@ -143,13 +222,18 @@ void PC_update(unsigned jsec, unsigned extended_value, char Branch, char Jump, c
 {
     unsigned next_PC = *PC + 4;
     
-    if (Jump == 1) {
+    if (Jump == 1) 
+    {
         // Concatenate upper 4 bits of PC+4 with 26-bit jsec << 2 
         *PC = (next_PC & 0xF0000000) | (jsec << 2);
-    } else if (Branch == 1 && Zero == 1) {
+    } 
+    else if (Branch == 1 && Zero == 1) 
+    {
         // Branch target is (PC+4) + (offset << 2) 
         *PC = next_PC + (extended_value << 2);
-    } else {
+    } 
+    else 
+    {
         *PC = next_PC;
     }
 }
